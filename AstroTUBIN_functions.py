@@ -6,10 +6,11 @@ from tqdm import tqdm
 import math
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 from photutils.centroids import centroid_com, centroid_2dg, centroid_sources
 from scipy.interpolate import interp1d
 
-flat_img = plt.imread('/Users/lukas/Dokumente/Uni/Thesis/calibration/FF_VIS.png')*65536
+#flat_img = plt.imread('/Users/lukas/Dokumente/Uni/Thesis/calibration/FF_VIS.png')*65536
 
 def load_png_images(path):
     image_list = []
@@ -34,7 +35,7 @@ def load_badpixelmap(bw_images):
     if os.path.exists('mask_weights.npy'):
 
         mask_weights = np.load('mask_weights.npy')
-        print('existing bad pixel map file loaded')
+        
     else:
 
         print('generating bad pixel map file')
@@ -51,7 +52,7 @@ def load_badpixelmap(bw_images):
         mask_weights = (mask + mask1 + mask2)/3
 
     np.save('mask_weights', mask_weights)
-    print('bad pixel map file generated and loaded')
+    print('bad pixel map file loaded')
 
     return mask_weights
 
@@ -464,8 +465,8 @@ def camera_angle(xy, focal_length = 22.8766, pixel_size = 0.00166995, sensor_siz
     
     for i in xy:
         
-        u = i[:,0] - 0.5 * flat_img.shape[1]
-        v = i[:,1] - 0.5 * flat_img.shape[0]
+        u = i[:,0] - 0.5 * 3664
+        v = i[:,1] - 0.5 * 2748
         
         r = np.sqrt(u**2 + v**2)
         K1 = -0.1781
@@ -578,8 +579,8 @@ def best_fit_transform(A, B):
     AA_dist = np.linalg.norm(AA, axis=1)
     #BB_dist = np.linalg.norm(BB, axis=1)
     
-    AA = AA[AA_dist<5.5]
-    BB = BB[AA_dist<5.5]
+    AA = AA[AA_dist<3.5]
+    BB = BB[AA_dist<3.5]
 
     H = np.dot(AA.T, BB).astype('float64')
 
@@ -593,14 +594,14 @@ def best_fit_transform(A, B):
     t = centroid_B.T - np.dot(R,centroid_A.T)
 
     T = t.reshape((1,2)).copy()
-    T[0] = -T[0]
-    
+    T[0][0] = -T[0][0]
+
     theta = np.degrees(np.arctan2(R[1,0], R[0,0]))
     
     return T[0], theta
 
 
-def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
+def match_images(rd, data, tgt_coord, norm_star_coord, mode=0):
 
     print('creating time series...')
 
@@ -625,9 +626,6 @@ def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
 
     for n, i in tqdm(enumerate(rd), total=rd.shape[0]):
     
-        #os.system('clear')
-        #tqdm._instances.clear()
-        #print('matching img id: ' + str(n))
         det_coord = np.array([i[:,0], i[:,1]])
         #ref_coord = np.array([rd[ref_idx][:,0], rd[ref_idx][:,1]])
     
@@ -652,8 +650,6 @@ def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
                 
         elif mode == 1:
             for m in range(conn_coord.shape[0]):
-                
-                #print(conn_coord, ref_coord.T, np.where(norm_star_coord==conn_coord[m,2:4])[0][0], len(flux_timestep))
     
                 flux_timestep[np.where(norm_star_coord==conn_coord[m,2:4])[0][0]] = data[n+ref_idx][1][np.where(i==conn_coord[m,0:2])[0]][0]
                 ap_timestep[np.where(norm_star_coord==conn_coord[m,2:4])[0][0]] = data[n+ref_idx][2][np.where(rd[ref_idx+n]==conn_coord[m,0:2])[0]][0]
@@ -662,17 +658,13 @@ def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
         translation_det, rotation = best_fit_transform(conn_coord[:,0:2], conn_coord[:,2:4])
         
         rotation_matrix = np.array([[np.cos(np.radians(rotation)), -np.sin(np.radians(rotation))], [np.sin(np.radians(rotation)), np.cos(np.radians(rotation))]])
-        #flip_trans = translation_det.copy()
-        #flip_trans[0] = -flip_trans[0]
+        flip_trans = translation_det.copy()
+        flip_trans[0] = -flip_trans[0]
 
-        rot_coords = np.dot(rotation_matrix, conn_coord[:,0:2].T).T - translation_det
+        rot_coords = np.dot(rotation_matrix, conn_coord[:,0:2].T).T + flip_trans
         r_catalog = np.linalg.norm(conn_coord[:,2:4], axis=1)
-
-        #print(rot_coords, rot_coords - conn_coord[:,2:4])
         
         residual = np.mean(np.abs(rot_coords - conn_coord[:,2:4])[r_catalog<2], axis=0)
-
-        #print(flip_trans, translation_det)
 
         displacement.append(translation_det)
         rot_angle.append(rotation)
@@ -683,7 +675,6 @@ def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
         rad_star_curve.append(np.array(rsc_timestep, dtype=object))
     
     print('...time series created')
-    #print(np.array(displacement))
 
     if mode == 1:
         point_xy = tgt_coord + np.array(displacement)
@@ -692,3 +683,207 @@ def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
         point = np.vstack((np.array(displacement).T, np.array(rot_angle))).T
         
     return np.hstack((point, res)), np.array(flux_time).T, np.array(ap).T, np.array(conn_stars, dtype=object), rad_star_curve
+
+
+##  VISUALITION  ----------------------------------------------------------
+
+def plot_pointing(pointing, times):
+
+    plt.close('all')
+    plt.figure(figsize=(14,4))
+    #plt.rcParams["font.family"] = "Times New Roman"
+
+    ax1=plt.subplot2grid((1, 3), (0, 0), colspan=1)
+
+    plt.scatter(pointing[:,0]*60 - np.mean(pointing[:,0]*60), pointing[:,1]*60 - np.mean(pointing[:,1]*60), color='C0', s=5, zorder=3)
+    plt.errorbar(pointing[:,0]*60 - np.mean(pointing[:,0]*60), pointing[:,1]*60 - np.mean(pointing[:,1]*60), xerr=pointing[:,3]*60, yerr=pointing[:,4]*60, linestyle='', linewidth=0.65, color='C0')
+
+
+    plt.axhline(color='k', linewidth=0.8, zorder=2)
+    plt.axvline(color='k', linewidth=0.8, zorder=2)
+    #plt.title('First Run', fontsize=15)
+    plt.grid()
+    plt.xticks(np.arange(-6,6.1,3))
+    plt.yticks(np.arange(-6,6.1,3))
+    plt.xlabel('X Error in arcmin')
+    plt.ylabel('Y Error in arcmin', rotation=90)
+    #plt.gca().set_aspect('equal')
+    plt.xlim(-8,8)
+    plt.ylim(-8,8)
+
+    ax2=plt.subplot2grid((1, 3), (0, 1), colspan=2)
+
+    plt.errorbar(times, pointing[:,0]*60 - np.mean(pointing[:,0]*60), yerr=pointing[:,3]*60, capsize=1.5, linestyle='-', color='r', linewidth = 0.75, label='x', marker='s', markersize=2, zorder=3)
+    plt.errorbar(times, pointing[:,1]*60 - np.mean(pointing[:,1]*60), yerr=pointing[:,4]*60, capsize=1.5, linestyle='-', color='lime', linewidth = 0.75, label='y', marker='s', markersize=2)
+
+    plt.ylabel('RMS in arcmin')
+    plt.xlabel('time since start of observation')
+
+    plt.ylim(-8,8)
+    #plt.xlim(-5,times[-1]-times[ref_idx]+15)
+    plt.yticks(np.arange(-6,6.1,3))
+    plt.xticks(np.arange(0,times[-1]-times[0]+15,240))
+    plt.axhline(color='k', linewidth=1)
+
+    plt.grid()
+    plt.legend()
+
+    plt.subplots_adjust(wspace=0.285)
+
+    plt.show()
+
+    return
+
+
+def plot_registration(idx, coord_ang, cat_coord, conn, point):
+
+    det_idx = idx
+
+    plt.close('all')
+    plt.figure(figsize=(12,11))
+
+
+    plt.subplot2grid((2, 2), (0, 0), colspan=1)
+    plt.scatter(coord_ang[det_idx][:,0], coord_ang[det_idx][:,1], color='darkorange', marker='*', alpha=0.5, s=75, linewidth=0)
+    plt.axhline(color='k', linewidth=0.8)
+    plt.axvline(color='k', linewidth=0.8)
+
+    plt.title('detected coordinates  img id: ' + str(det_idx))
+    plt.xlabel('deg from vertical center plane')
+    plt.ylabel('deg from horizontal center plane')
+    plt.xlim(-8.5,8.5)
+    plt.ylim(-8.5,8.5)
+    plt.xticks(np.arange(-8,8.1,2))
+    plt.yticks(np.arange(-8,8.1,2))
+    plt.grid()
+    plt.gca().set_aspect('equal')
+
+
+    plt.subplot2grid((2, 2), (0, 1), colspan=1)
+    plt.scatter(cat_coord[:,0], cat_coord[:,1], marker='*', alpha=0.5, s=75, linewidth=0)
+    plt.axhline(color='k', linewidth=0.8)
+    plt.axvline(color='k', linewidth=0.8)
+    #plot_triangle([tri1[0], tri1[1]])
+
+    for i in range(cat_coord.shape[0]):
+        #plt.text(radec[ref_idx][i,0]+0.25, radec[ref_idx][i,1]-0.1, str(i), fontsize=5)
+        plt.text(cat_coord[i,0]+0.25, cat_coord[i,1]-0.1, str(i), fontsize=5)
+
+    plt.title('NOMAD star catalog as reference')
+    plt.xlabel('deg from vertical center plane')
+    plt.ylabel('deg from horizontal center plane')
+    plt.xlim(-8.5,8.5)
+    plt.ylim(-8.5,8.5)
+    plt.xticks(np.arange(-8,8.1,2))
+    plt.yticks(np.arange(-8,8.1,2))
+    plt.grid()
+    plt.gca().set_aspect('equal')
+
+
+    plt.subplot2grid((2, 2), (1, 0), colspan=1)
+
+    center = np.array([-2.25,-4])
+
+    plt.scatter(cat_coord[:,0], cat_coord[:,1], marker='*', s=75, alpha=0.5, linewidth=0)
+    plt.scatter(coord_ang[det_idx][:,0], coord_ang[det_idx][:,1], color='darkorange', marker='*', s=75, alpha=0.5, linewidth=0)
+    plt.axhline(color='k', linewidth=0.8)
+    plt.axvline(color='k', linewidth=0.8)
+   
+    for j in range(conn[det_idx].shape[0]):
+        plt.plot([conn[det_idx][j][0], conn[det_idx][j][2]],  [conn[det_idx][j][1], conn[det_idx][j][3]], 'k', alpha=0.5)
+        
+    plt.text(14.5,6.3, 'center pointing: {0:.2f} RA, {1:.2f} DEC\n\nrotation: {2:.2f} deg'.format(point[det_idx][0], point[det_idx][1], point[det_idx][2]), fontsize=12)
+    plt.title('matching coordinates')
+    plt.xlabel('deg from vertical center plane')
+    plt.ylabel('deg from horizontal center plane')
+    plt.xlim(-8.5,8.5)
+    plt.ylim(-8.5,8.5)
+    plt.xticks(np.arange(-8,8.1,2))
+    plt.yticks(np.arange(-8,8.1,2))
+    plt.legend(loc='lower right')
+    plt.grid()
+    plt.gca().set_aspect('equal')
+
+    plt.show()
+
+    return
+
+
+def plot_pointing_in_stars(tgt_coord, pointing, x, norm_vmag):
+
+    center = ((tgt_coord[0]+pointing[:,0].mean())/2, (tgt_coord[1]+pointing[:,1].mean())/2)
+
+    fov = np.array([[i,j] for i, j in zip([0, 0, 3664, 3664], [0, 2748, 0, 2748])]).astype('int')
+
+    ra_lim, dec_lim = pxl_to_angle(fov)
+    ra_lim, dec_lim = ra_lim * 180/math.pi, dec_lim * 180/math.pi
+
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+
+    plt.scatter(x['RAJ2000'], x['DEJ2000'], marker='o', color='k', s=norm_vmag*20+5)
+    plt.scatter(tgt_coord[0], tgt_coord[1], marker='+', color='r', label='target')
+    plt.scatter(pointing[:,0], pointing[:,1], color='C0', label='actual pointing', alpha=0.5, s=1)
+    plt.scatter(pointing[:,0].mean(), pointing[:,1].mean(), marker='+', color='C1', label='pointing mean', alpha=1)
+    plt.gca().add_patch(plt.Circle((tgt_coord[0], tgt_coord[1]), dec_lim[0], linewidth=1, linestyle='--', edgecolor='C1', alpha=0.35, facecolor='none', label='area of interest'))
+    plt.gca().add_patch(Rectangle((tgt_coord[0]-ra_lim[0], tgt_coord[1]-dec_lim[0]), -2*ra_lim[3], -2*dec_lim[3], linewidth=1,linestyle='--',edgecolor='k',alpha=0.5,facecolor='none', label='image frame', angle=0))
+    plt.gca().add_patch(Rectangle((center[0]+1, center[1]-1), -2, 2, linewidth=0.8,linestyle='-',edgecolor='k',alpha=1,facecolor='none'))
+
+    ax.set_yticks(range(-90,91, 2))
+    ax.set_ylim(tgt_coord[1]+ra_lim[0]*1.05, tgt_coord[1]-ra_lim[0]*1.05)
+    ax.set_xticks(range(0,361, 2))
+    ax.set_xlim(tgt_coord[0]-ra_lim[0]*1.05, tgt_coord[0]+ra_lim[0]*1.05)
+
+    plt.xlabel('RA J2000')
+    plt.ylabel('DEC J2000')
+    plt.legend()
+    plt.grid()
+
+    plt.show()
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+
+    plt.scatter(x['RAJ2000'], x['DEJ2000'], marker='o', color='k', s=norm_vmag*20+10)
+    plt.scatter(tgt_coord[0], tgt_coord[1], marker='+', color='r', label='target', s=100)
+    plt.scatter(pointing[:,0], pointing[:,1], color='C0', label='actual pointing', alpha=0.5, s=1)
+
+    plt.scatter(pointing[:,0].mean(), pointing[:,1].mean(), marker='+', color='C1', label='pointing mean', alpha=1, s=100)
+
+    plt.gca().set_aspect('equal')
+    ax.set_yticks(range(-90,91, 10))
+    ax.set_ylim(center[1]-1, center[1]+1)
+    ax.set_xticks(range(0,361, 10))
+    ax.set_xlim(center[0]+1, center[0]-1)
+
+    plt.show()
+
+    return
+
+
+def plot_overlay_det_starcat(tgt_coord, pointing, conn_stars):
+
+    angle = np.radians(pointing[0,2])
+
+    rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
+                                [np.sin(angle), np.cos(angle)]])
+
+    tgt_dev = pointing[0,0:2]-tgt_coord
+    tgt_dev[0] *= -1
+
+    rotated_stars = np.dot(rotation_matrix, conn_stars[0][:,0:2].T).T + tgt_dev
+
+    plt.close('all')
+    plt.figure(figsize=(12,8))
+
+    plt.scatter(conn_stars[0][:,2], conn_stars[0][:,3], marker='+', color='k', s=50, label='catalog', alpha=0.95)
+    plt.scatter(rotated_stars[:,0], rotated_stars[:,1], marker='+', color='orange', s=50, label='detector', alpha=0.75)
+
+    plt.xlim(-8.5,8.5)
+    plt.ylim(-5.5,5.5)
+
+    plt.legend()
+
+    plt.show()
+
+    return
