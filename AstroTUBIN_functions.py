@@ -10,8 +10,6 @@ from matplotlib.patches import Rectangle
 from photutils.centroids import centroid_com, centroid_2dg, centroid_sources
 from scipy.interpolate import interp1d
 
-#flat_img = plt.imread('/Users/lukas/Dokumente/Uni/Thesis/calibration/FF_VIS.png')*65536
-
 def load_png_images(path):
     image_list = []
     times = []
@@ -687,10 +685,11 @@ def match_images(rd, data, tgt_coord, norm_star_coord, mode=0):
 
 ##  VISUALITION  ----------------------------------------------------------
 
+
 def plot_pointing(pointing, times):
 
     plt.close('all')
-    plt.figure(figsize=(14,4))
+    plt.figure(figsize=(14,4), dpi=200)
     #plt.rcParams["font.family"] = "Times New Roman"
 
     ax1=plt.subplot2grid((1, 3), (0, 0), colspan=1)
@@ -721,8 +720,9 @@ def plot_pointing(pointing, times):
 
     plt.ylim(-8,8)
     #plt.xlim(-5,times[-1]-times[ref_idx]+15)
-    plt.yticks(np.arange(-6,6.1,3))
-    plt.xticks(np.arange(0,times[-1]-times[0]+15,240))
+    plt.yticks(np.arange(-6, 6.1, 3))
+    min_tick = min(240, times[-1])
+    plt.xticks(np.arange(0, times[-1]-times[0]+15, min_tick))
     plt.axhline(color='k', linewidth=1)
 
     plt.grid()
@@ -740,7 +740,7 @@ def plot_registration(idx, coord_ang, cat_coord, conn, point):
     det_idx = idx
 
     plt.close('all')
-    plt.figure(figsize=(12,11))
+    plt.figure(figsize=(12,11), dpi=200)
 
 
     plt.subplot2grid((2, 2), (0, 0), colspan=1)
@@ -800,7 +800,7 @@ def plot_registration(idx, coord_ang, cat_coord, conn, point):
     plt.ylim(-8.5,8.5)
     plt.xticks(np.arange(-8,8.1,2))
     plt.yticks(np.arange(-8,8.1,2))
-    plt.legend(loc='lower right')
+    #plt.legend(loc='lower right')
     plt.grid()
     plt.gca().set_aspect('equal')
 
@@ -819,7 +819,7 @@ def plot_pointing_in_stars(tgt_coord, pointing, x, norm_vmag):
     ra_lim, dec_lim = ra_lim * 180/math.pi, dec_lim * 180/math.pi
 
     plt.close('all')
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(9, 9), dpi=200)
 
 
     plt.scatter(x['RAJ2000'], x['DEJ2000'], marker='o', color='k', s=norm_vmag*20+5)
@@ -861,23 +861,28 @@ def plot_pointing_in_stars(tgt_coord, pointing, x, norm_vmag):
     return
 
 
-def plot_overlay_det_starcat(tgt_coord, pointing, conn_stars):
+def plot_overlay_det_starcat(idx, tgt_coord, pointing, conn_stars):
 
-    angle = np.radians(pointing[0,2])
+    angle = np.radians(pointing[idx,2])
 
     rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
                                 [np.sin(angle), np.cos(angle)]])
 
-    tgt_dev = pointing[0,0:2]-tgt_coord
+    tgt_dev = pointing[idx,0:2]-tgt_coord
     tgt_dev[0] *= -1
 
-    rotated_stars = np.dot(rotation_matrix, conn_stars[0][:,0:2].T).T + tgt_dev
+    rotated_stars = np.dot(rotation_matrix, conn_stars[idx][:,0:2].T).T + tgt_dev
 
     plt.close('all')
-    plt.figure(figsize=(12,8))
+    plt.figure(figsize=(9,6), dpi=200)
 
-    plt.scatter(conn_stars[0][:,2], conn_stars[0][:,3], marker='+', color='k', s=50, label='catalog', alpha=0.95)
+    plt.scatter(conn_stars[idx][:,2], conn_stars[idx][:,3], marker='+', color='k', s=50, label='catalog', alpha=0.75)
     plt.scatter(rotated_stars[:,0], rotated_stars[:,1], marker='+', color='orange', s=50, label='detector', alpha=0.75)
+
+    for i in range(len(conn_stars[idx])):
+        plt.arrow(conn_stars[idx][i, 2], conn_stars[idx][i, 3],
+              -(conn_stars[idx][i, 2]-rotated_stars[i, 0])*10,
+              -(conn_stars[idx][i, 3]-rotated_stars[i, 1])*10, width=0.0001, head_width=0.0001, edgecolor=None, color='k', overhang=1, alpha=0.5)
 
     plt.xlim(-8.5,8.5)
     plt.ylim(-5.5,5.5)
