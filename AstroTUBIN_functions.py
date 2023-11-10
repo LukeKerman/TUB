@@ -592,8 +592,8 @@ def best_fit_transform(A, B):
     
     t = centroid_B.T - np.dot(R,centroid_A.T)
 
-    T = t.reshape((1,2))
-    T[:, 0] *= -1
+    T = t.reshape((1,2)).copy()
+    T[0] = -T[0]
     
     theta = np.degrees(np.arctan2(R[1,0], R[0,0]))
     
@@ -662,13 +662,18 @@ def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
         translation_det, rotation = best_fit_transform(conn_coord[:,0:2], conn_coord[:,2:4])
         
         rotation_matrix = np.array([[np.cos(np.radians(rotation)), -np.sin(np.radians(rotation))], [np.sin(np.radians(rotation)), np.cos(np.radians(rotation))]])
-        trans_det = translation_det
-        trans_det[0] *= -1
-        rot_coords = np.dot(rotation_matrix, conn_coord[:,0:2].T).T + trans_det
+        #flip_trans = translation_det.copy()
+        #flip_trans[0] = -flip_trans[0]
+
+        rot_coords = np.dot(rotation_matrix, conn_coord[:,0:2].T).T - translation_det
         r_catalog = np.linalg.norm(conn_coord[:,2:4], axis=1)
+
+        #print(rot_coords, rot_coords - conn_coord[:,2:4])
         
         residual = np.mean(np.abs(rot_coords - conn_coord[:,2:4])[r_catalog<2], axis=0)
-    
+
+        #print(flip_trans, translation_det)
+
         displacement.append(translation_det)
         rot_angle.append(rotation)
         flux_time.append(np.array(flux_timestep))
@@ -678,9 +683,11 @@ def match_images(rd, data, norm_star_coord, tgt_coord, mode=0, ):
         rad_star_curve.append(np.array(rsc_timestep, dtype=object))
     
     print('...time series created')
+    #print(np.array(displacement))
 
     if mode == 1:
-        point = np.vstack((np.array(tgt_coord+displacement).T, np.array(rot_angle))).T
+        point_xy = tgt_coord + np.array(displacement)
+        point = np.vstack((point_xy.T, np.array(rot_angle))).T
     elif mode == 0:
         point = np.vstack((np.array(displacement).T, np.array(rot_angle))).T
         
