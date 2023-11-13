@@ -9,6 +9,23 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from photutils.centroids import centroid_com, centroid_2dg, centroid_sources
 from scipy.interpolate import interp1d
+from astroquery.vizier import Vizier
+import astropy.units as u
+import astropy.coordinates as coord
+
+def load_star_catalog(tgt, vmag_lim=5.65, radius=8):
+
+    tgt_coord = np.array(tgt)
+
+    Vizier.ROW_LIMIT = -1
+
+    full_catalog = Vizier.query_region(coord.SkyCoord(ra=tgt_coord[0]*u.deg, dec=tgt_coord[1]*u.deg, unit=(u.deg, u.deg), frame='icrs'), radius=radius*u.deg, column_filters={'Vmag': '<'+str(vmag_lim)}, catalog='NOMAD')
+    catalog = full_catalog[-1]['NOMAD1', 'RAJ2000', 'DEJ2000', 'Vmag']
+
+    norm_star_coord = np.array([[-(i-tgt_coord[0]), j-tgt_coord[1]] for i, j in zip(catalog['RAJ2000'], catalog['DEJ2000'])]) #star coordinates with target offset
+    norm_vmag = 1-catalog['Vmag']/max(catalog['Vmag']) #dot size parameter (visualisation)
+
+    return np.vstack((norm_star_coord.T, np.array(norm_vmag))).T, catalog
 
 def load_png_images(path):
     image_list = []
@@ -24,6 +41,9 @@ def load_png_images(path):
             time = int(time_str[:2])*60*60 + int(time_str[2:4])*60 + int(time_str[4:6])
             times.append(time)
     times = np.array(times)-times[0]
+
+    print('import complete')
+
     return np.array(image_list), times
 
 
