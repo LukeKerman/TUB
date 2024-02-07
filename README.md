@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository is a comprehensive collection of projects and codebases developed as part of my thesis, as well as various side projects focused on machine learning and image segmentation using TUBIN data. The repository is divided into two main parts: **AstroTUBIN** and **TUBIN_CNN**.
+This repository is a comprehensive collection of projects and codebases developed as part of my thesis, as well as various side projects focused on machine learning and image segmentation using TUBIN data. The repository is currently divided into two main parts: **AstroTUBIN** and **TUBIN_CNN**.
 
 ### AstroTUBIN
 
