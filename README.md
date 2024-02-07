@@ -12,7 +12,7 @@ AstroTUBIN is a meticulously crafted package that includes a collection of funct
 
 TUBIN_CNN is a diverse set of projects exploring the applications of Convolutional Neural Networks (CNNs) in image recognition and segmentation with TUBIN data. It includes:
 
-- Basic CNN models like MNIST, CIFAR-10, and CIFAR-100 to facilitate learning and experimentation with neural networks.
+- Basic CNN models for MNIST, CIFAR-10, and CIFAR-100 image catalog to facilitate learning and experimentation with neural networks.
 - Jupyter notebooks dedicated to label map acquisition for TUBIN images, laying the groundwork for advanced image segmentation tasks.
 - Training materials and notebooks for developing TUBIN image segmentation models, enabling users to dive deep into machine learning applications with specific focus on astronomical imagery.
 
