@@ -6,7 +6,7 @@ This repository is a comprehensive collection of projects and codebases develope
 
 ### AstroTUBIN
 
-AstroTUBIN is a meticulously crafted package that includes a collection of functions along with a Jupyter notebook designed for the extraction and analysis of astrophotometric data from images. The core objective of AstroTUBIN is to analyze the pointing stability of the TUBIN telescope and assess the impact of jitter on photometric quality. This package is essential for researchers and enthusiasts in the field of astrophysics, providing tools to process and analyze celestial data with precision.
+AstroTUBIN is a meticulously crafted package that includes a collection of functions along with a Jupyter notebook designed for the extraction and analysis of astrophotometric data from images. The core objective of AstroTUBIN is to analyze the pointing stability of the TUBIN VIS camera and assess the impact of jitter on photometric quality. This package is essential part of my master thesis, providing tools to process and analyze celestial data with precision.
 
 ### TUBIN_CNN
 
