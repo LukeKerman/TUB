@@ -1,4 +1,4 @@
-# README for AstroTUBIN & TUBIN_CNN Projects
+# Projects
 
 ## Overview
 
