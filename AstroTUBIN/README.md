@@ -26,4 +26,3 @@ AstroTUBIN is a data processing and analysis pipeline designed for astronomical 
 ## Contributing
 
 Contributions to AstroTUBIN are welcome! Please read the contributing guidelines before submitting pull requests.
-
