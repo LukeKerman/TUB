@@ -1,6 +1,6 @@
 # Thermal Infrared Image Classifier
 
-This repository contains the code and models for a machine learning project focused on classifying thermal infrared (IR) images. The models aim to identify and segment regions of interest within IR imagery.
+This repository contains the code and models for a machine learning project focused on classifying thermal infrared (1.7 μm) images. The models aim to identify and segment regions of interest within IR imagery.
 
 ## Overview
 This repository contains the necessary files for training and evaluating an infrared cloud classification and mask prediction model. The model is designed to analyze infrared images and predict cloud masks, comparing them to ground truth data for evaluation.## Models
