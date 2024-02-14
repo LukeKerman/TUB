@@ -8,14 +8,14 @@ This repository contains the necessary files for training and evaluating an infr
 ## Contents
 The repository includes several trained models:
 
-- `best_IR_clf_256x16_wc_2.keras` - Another variation of the model with a different configuration or training checkpoint.
-- `best_IR_clf_256x16_wc_2.hdf5`
-- `best_IR_clf_256x16_wc.keras` - The first model file.
-- `best_IR_img2classmap_128x32_wc.keras` - A model trained to 128x128 images and class labels.
+- `best_IR_clf_256x16_wc_2.keras` - best trained model for 256x256x1 TUBIN IR images
+- `best_IR_clf_256x16_wc.keras` - base model file 256x256x1
+- `best_IR_img2classmap_128x32_wc.keras` - trained to 128x128x1 images
 
 ## Code
 
 - `TUBIN_IR_classifier_model.ipynb` - A Jupyter notebook containing the code for training the models, evaluating them, and possibly visualizing the results.
+- `TUBIN_IR_cloudmask_generator.ipynb` - A Jupyter notebook containing the code for preprocessing TUBIN IR images and annotating class map including a threshold detection algorithm
 
 ## Results
 
