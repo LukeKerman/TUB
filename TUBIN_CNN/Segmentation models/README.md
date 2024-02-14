@@ -21,7 +21,11 @@ The repository includes several trained models:
 
 ![Evaluation Results](eval_plot_selected.png)
 
-The image above shows the evaluation results of the model. It includes test images, predicted masks, ground truth masks, and the differences between predictions and ground truth.
+The examples above show the evaluation results of the model. It includes test images, predicted masks, ground truth masks, and the differences between predictions and ground truth.
+
+![Full Frame Result](full_frame_pred.png)
+
+Output layers with different thresholds and fire pixel voting.
 
 ## Usage
 
