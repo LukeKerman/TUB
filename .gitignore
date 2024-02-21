@@ -1,1 +1,2 @@
-.DS_Store
+*.DS_Store
+TUBIN_CNN/Segmentation models/Sentinel/
