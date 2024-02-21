@@ -1,8 +1,7 @@
-astropy
-astroquery
+h5py
 matplotlib
 numpy
-pandas
-photutils
-scipy
+scikit-learn
+keras
+opencv-python
 tqdm
