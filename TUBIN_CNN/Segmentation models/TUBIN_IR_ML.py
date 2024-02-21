@@ -9,26 +9,26 @@ import random
 from sklearn.model_selection import train_test_split
 from keras import layers, models
 from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from keras.optimizers.legacy import SGD, Adam
 import cv2
 from tqdm import tqdm
 
 class TUBINImageProcessor:
-    
-    def __init__(self, path, section_size=256, overlap=0.25):
+    def __init__(self, path, section_size=256, overlap=0.5):
         self.path = path
         self.section_size = section_size
         self.overlap = overlap
-        self.image_data, self.cloud_map_data = self.open_data()
+
+        self.image_data, self.label_map_data = self.open_data()
         self.class_weights = self.define_class_weights()
         self.sq_images = self.cut_images()
         self.sq_labels = self.cut_labels()
-        self.image_train, self.image_test, self.cloud_train, self.cloud_test = self.train_test_split()
+        self.image_train, self.image_test, self.mask_train, self.mask_test = self.train_test_split()
 
     def open_data(self):
         image_data_list = []
-        cloud_map_data_list = []
+        label_map_data_list = []
         norm_temp = 50
 
         for filename in os.listdir(self.path):
@@ -38,21 +38,23 @@ class TUBINImageProcessor:
                         img_data = file['image'][:] / norm_temp
                         cp_data = file['label_map'][:]
                         image_data_list.append(img_data)
-                        cloud_map_data_list.append(cp_data)
+                        label_map_data_list.append(cp_data)
                     else:
                         print(f"Dataset 'image' not found in file: {os.path.join(self.path, filename)}")
 
         image_data = np.array(image_data_list)
-        cloud_map_data = np.array(cloud_map_data_list)
-        cloud_map_data = np.squeeze(cloud_map_data, axis=-2)
+        label_map_data = np.array(label_map_data_list)
+        label_map_data = np.squeeze(label_map_data, axis=-2)
 
-        return image_data, cloud_map_data
+        print(f'Shape of image array: {image_data.shape}')
+
+        return image_data, label_map_data
 
     def cut_images(self):
         return self._cut(self.image_data)
 
     def cut_labels(self):
-        return self._cut(self.cloud_map_data, label=True)
+        return self._cut(self.label_map_data, label=True)
 
     def _cut(self, data, label=False):
         cut_frames = []
@@ -68,11 +70,16 @@ class TUBINImageProcessor:
                     start_col = int(j * overlap_step)
                     cut_frames.append(image[start_row:start_row+self.section_size, start_col:start_col+self.section_size, :])
 
-        return np.array(cut_frames)
+        cut_frames = np.array(cut_frames)
+
+        if label == False:
+            print(f'Shape of square image array: {cut_frames.shape}')
+
+        return cut_frames
 
     def define_class_weights(self):
-        total_counts = np.prod(self.cloud_map_data.shape) / 4
-        class_counts = np.sum(self.cloud_map_data, axis=(0, 1, 2))
+        total_counts = np.prod(self.label_map_data.shape) / 4
+        class_counts = np.sum(self.label_map_data, axis=(0, 1, 2))
         class_weights = {i: max(1, total_counts / count) for i, count in enumerate(class_counts)}
 
         class_weights = {
@@ -108,10 +115,10 @@ class TUBINImageProcessor:
             # Adjust this if cut_labels has a different structure
             combined_map = np.argmax(self.sq_labels[current_index, :, :, :], axis=-1)
 
-            # Plot the corresponding cloud map
+            # Plot the corresponding mask map
             plt.subplot(num_samples, 2, i*2 + 2)
             plt.imshow(combined_map, cmap='binary_r')
-            plt.title(f'Cloud Map - Sample {current_index + 1}')
+            plt.title(f'Label Mask - Sample {current_index + 1}')
             plt.colorbar(shrink=0.7)
 
         plt.tight_layout()
@@ -212,14 +219,15 @@ class UNetTrainer:
         early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
         reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=25, min_lr=1e-4)
         checkpoint = ModelCheckpoint('model_epoch_{epoch:02d}.h5', save_best_only=False)
+        #plot_learning = PlotLearning()
         return [reduce_lr]
 
-    def fit_model(self, image_train, cloud_train, image_test, cloud_test, batch_size=8, epochs=50, class_weights=None):
+    def fit_model(self, image_train, mask_train, image_test, mask_test, batch_size=8, epochs=50, class_weights=None):
 
         steps_per_epoch = len(image_train) // batch_size
         gen_seed = 42
         image_generator = self.datagen.flow(image_train, batch_size=batch_size, seed=gen_seed)
-        mask_generator = self.labelgen.flow(cloud_train, batch_size=batch_size, seed=gen_seed)
+        mask_generator = self.labelgen.flow(mask_train, batch_size=batch_size, seed=gen_seed)
         train_generator = zip(image_generator, mask_generator)
 
         self.history = self.model.fit(
@@ -227,18 +235,18 @@ class UNetTrainer:
             steps_per_epoch=steps_per_epoch, 
             epochs=epochs,
             class_weight=class_weights, 
-            validation_data=(image_test, cloud_test),
-            #callbacks=self.callbacks
+            validation_data=(image_test, mask_test),
+            callbacks=self.callbacks
             )
 
         return self.history
     
-    def continue_training(self, image_train, cloud_train, image_test, cloud_test, additional_epochs=100, batch_size=8, class_weights=None):
+    def continue_training(self, image_train, mask_train, image_test, mask_test, additional_epochs=100, batch_size=8, class_weights=None, gen_seed = None):
 
         steps_per_epoch = len(image_train) // batch_size
-        gen_seed = 42
+        if gen_seed == None: gen_seed = random.randint(0,100)
         image_generator = self.datagen.flow(image_train, batch_size=batch_size, seed=gen_seed)
-        mask_generator = self.labelgen.flow(cloud_train, batch_size=batch_size, seed=gen_seed)
+        mask_generator = self.labelgen.flow(mask_train, batch_size=batch_size, seed=gen_seed)
         train_generator = zip(image_generator, mask_generator)
 
         # Fit the model again for additional_epochs
@@ -247,7 +255,7 @@ class UNetTrainer:
             steps_per_epoch=steps_per_epoch, 
             epochs=additional_epochs,
             class_weight=class_weights, 
-            validation_data=(image_test, cloud_test),
+            validation_data=(image_test, mask_test),
             callbacks=self.callbacks
             )
 
@@ -283,7 +291,7 @@ class UNetTrainer:
         rand_offset = random.randint(0, data.shape[0] - num_samples - 1)
         print(f"Random offset: {rand_offset}, Total samples: {data.shape[0]}")
 
-        plt.figure(figsize=(12, 8))
+        plt.figure(figsize=(num_samples*2, 8))
 
         for i in range(num_samples):
             # Original image (input)
@@ -492,3 +500,7 @@ class IRImageClassifier:
         #plt.axis('off')  # Hide axes
         plt.title('Composite Output Map with Thresholds and Hotspots')
         plt.show()
+
+
+
+
